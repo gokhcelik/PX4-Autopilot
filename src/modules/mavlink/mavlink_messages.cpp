@@ -118,6 +118,7 @@
 #include <uORB/topics/vehicle_trajectory_waypoint.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/tgn_state.h>
 
 using matrix::Vector3f;
 using matrix::wrap_2pi;
@@ -295,6 +296,72 @@ static void get_mavlink_mode_state(const struct vehicle_status_s *const status, 
 		*mavlink_state = MAV_STATE_CRITICAL;
 	}
 }
+
+
+
+class MavlinkStreamTGNStateMessage : public MavlinkStream
+{
+public:
+    const char *get_name() const
+    {
+        return MavlinkStreamTGNStateMessage::get_name_static();
+    }
+    static const char *get_name_static()
+    {
+        return "tgn_state";
+    }
+    static uint16_t get_id_static()
+    {
+        return MAVLINK_MSG_ID_TGN_STATE;
+    }
+    uint16_t get_id()
+    {
+        return get_id_static();
+    }
+    static MavlinkStream *new_instance(Mavlink *mavlink)
+    {
+        return new MavlinkStreamTGNStateMessage(mavlink);
+    }
+    unsigned get_size()
+    {
+        return MAVLINK_MSG_ID_TGN_STATE_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES;
+    }
+
+private:
+    uORB::Subscription _sub{ORB_ID(tgn_state)};
+
+    /* do not allow top copying this class */
+    MavlinkStreamTGNStateMessage(MavlinkStreamTGNStateMessage &);
+    MavlinkStreamTGNStateMessage& operator = (const MavlinkStreamTGNStateMessage &);
+
+protected:
+    explicit MavlinkStreamTGNStateMessage(Mavlink *mavlink) : MavlinkStream(mavlink)
+    {}
+
+    bool send(const hrt_abstime t) override
+    {
+        struct tgn_state_s _tgn_state;    //make sure ca_traj_struct_s is the definition of your uORB topic
+
+        if (_sub.update(&_tgn_state)) {
+            mavlink_tgn_state_t _msg_tgn_state;  //make sure mavlink_tgn_state_t is the definition of your custom MAVLink message
+
+         /*   _msg_tgn_state.timestamp = _tgn_state.timestamp;
+            _msg_tgn_state.time_start_usec = _tgn_state.time_start_usec;
+            _msg_tgn_state.time_stop_usec  = _tgn_state.time_stop_usec;
+            _msg_tgn_state.coefficients =_tgn_state.coefficients;
+            _msg_tgn_state.seq_id = _tgn_state.seq_id;*/
+
+            mavlink_msg_tgn_state_send_struct(_mavlink->get_channel(), &_msg_tgn_state);
+
+            return true;
+        }
+
+        return false;
+    }
+};
+
+
+
 
 
 class MavlinkStreamHeartbeat : public MavlinkStream
@@ -5307,7 +5374,8 @@ static const StreamListItem streams_list[] = {
 	create_stream_list_item<MavlinkStreamProtocolVersion>(),
 	create_stream_list_item<MavlinkStreamFlightInformation>(),
 	create_stream_list_item<MavlinkStreamStorageInformation>(),
-	create_stream_list_item<MavlinkStreamRawRpm>()
+	create_stream_list_item<MavlinkStreamRawRpm>(),
+	create_stream_list_item<MavlinkStreamTGNStateMessage>()
 };
 
 const char *get_stream_name(const uint16_t msg_id)

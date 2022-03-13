@@ -168,6 +168,7 @@ set(msg_files
 	wind_estimate.msg
 	yaw_estimator_status.msg
 	togan_hedef.msg
+	tgn_state.msg
 )
 
 set(deprecated_msgs
